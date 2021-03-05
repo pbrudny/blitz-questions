@@ -5,7 +5,8 @@ import * as z from "zod"
 const UpdateQuestion = z
   .object({
     id: z.number(),
-    name: z.string(),
+    text: z.string(),
+    choices: z.array(z.object({ id: z.number().optional(), text: z.string() }).nonstrict()),
   })
   .nonstrict()
 
@@ -14,7 +15,19 @@ export default resolver.pipe(
   resolver.authorize(),
   async ({ id, ...data }) => {
     // TODO: in multi-tenant app, you must add validation to ensure correct tenant
-    const question = await db.question.update({ where: { id }, data })
+    const question = await db.question.update({
+      where: { id },
+      data: {
+        ...data,
+        choices: {
+          upsert: data.choices.map((choice) => ({
+            where: { id: choice.id || 0 },
+            create: { text: choice.text },
+            update: { text: choice.text },
+          })),
+        },
+      },
+    })
 
     return question
   }
